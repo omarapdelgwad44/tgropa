@@ -10,7 +10,7 @@ public class DataBaseContext : DbContext
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
     {
         // Correct SQLite connection string
-        optionsBuilder.UseSqlite(@"Data Source=C:\Users\omara\source\repos\tgropa\DB.db");
+        optionsBuilder.UseSqlite(@"Data Source=C:\Users\omara\DB.db");
     }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)

@@ -1,5 +1,6 @@
 ﻿
 using Microsoft.EntityFrameworkCore;
+using System.Linq;
 using System.Text;
 using tgropa.Data;
 
@@ -116,9 +117,23 @@ namespace tgropa.Core
         {
             try
             {
-                var invoice = Find(Id);
+                var invoice = db.Invoices.Find(Id);  
                 if (invoice != null)
                 {
+                    var res = db.InvoiceItems
+      .Where(x => x.InvoiceId == invoice.Id)
+      .Select(x => new { x.Item, x.Quantity });
+
+                    foreach (var item in res)
+                    {
+                        item.Item.Quantity += item.Quantity;
+                        db.Items.Update(item.Item);
+                        db.InvoiceItems.Remove(db.InvoiceItems.FirstOrDefault(ii => ii.InvoiceId == invoice.Id && ii.ItemId == item.Item.Id));
+                        db.SaveChanges();
+                       // Console.WriteLine($"{ item.Item.Quantity }    {item.Quantity}");
+
+                    
+                   }
                     db.Invoices.Remove(invoice);
                     db.SaveChanges();
                     return 1;
@@ -135,12 +150,12 @@ namespace tgropa.Core
         {
             try
             {
-                return db.Invoices.FirstOrDefault(x => x.Id == Id) ?? new Invoice();
+                return db.Invoices.Find(Id);
             }
             catch (Exception ex)
             {
                 Console.WriteLine($"Error: {ex.Message}");
-                return new Invoice();
+                return null;
             }
         }
         public List<Invoice> GetAllData()
