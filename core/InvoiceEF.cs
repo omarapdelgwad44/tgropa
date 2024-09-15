@@ -1,5 +1,6 @@
 ﻿
 using Microsoft.EntityFrameworkCore;
+using System.Text;
 using tgropa.Data;
 
 namespace tgropa.Core
@@ -11,7 +12,6 @@ namespace tgropa.Core
         {
             db = new DataBaseContext();
         }
-
         public int Add(Invoice invoice)
         {
             try
@@ -29,7 +29,6 @@ namespace tgropa.Core
                 return 0;  // Failure
             }
         }
-
         public int AddInvoiceWithItemIds(Invoice invoice, List<int> itemIds, List<int> itemQuantities)
         {
             using var transaction = db.Database.BeginTransaction();
@@ -51,24 +50,33 @@ namespace tgropa.Core
                             // Reduce the stock of the item
                             item.Quantity -= quantityToReduce;
 
-                            // Add the item to the invoice (via the junction table InvoiceItem)
-                            var invoiceItem = new InvoiceItem
+                            // Check if the item is already in the invoice (to avoid duplicate entry)
+                            var existingInvoiceItem = db.InvoiceItems
+                                .FirstOrDefault(ii => ii.InvoiceId == invoice.Id && ii.ItemId == itemId);
+
+                            if (existingInvoiceItem != null)
                             {
-                                ItemId = item.Id,
-                                InvoiceId = invoice.Id,
-                                Quantity = quantityToReduce
-                            };
+                                // If the item already exists in the invoice, just update the quantity
+                                existingInvoiceItem.Quantity += quantityToReduce;
+                                db.InvoiceItems.Update(existingInvoiceItem);
+                            }
+                            else
+                            {
+                                // If the item does not exist, add it to the invoice
+                                var invoiceItem = new InvoiceItem
+                                {
+                                    ItemId = item.Id,
+                                    InvoiceId = invoice.Id,
+                                    Quantity = quantityToReduce
+                                };
+                                invoice.InvoiceItems.Add(invoiceItem);
+                            }
 
-                            // Add the new InvoiceItem to the invoice
-                            invoice.InvoiceItems.Add(invoiceItem);
-
-                            // Save changes after updating item quantity
+                            // Update the item's quantity in the database
                             db.Items.Update(item);
-
                         }
                         else
                         {
-                            // Notify the user about the stock limitation
                             Console.WriteLine($"Insufficient stock for {item.Name}. Available: {item.Quantity}, Requested: {quantityToReduce}");
                             return 0;  // Failure due to insufficient stock
                         }
@@ -79,28 +87,31 @@ namespace tgropa.Core
                     }
                 }
 
-                // Add the invoice with its items to the database
-                db.Invoices.Add(invoice);
-                db.SaveChanges();
+                // Check if the invoice already exists, update it; otherwise, add a new one
+                if (db.Invoices.Find(invoice.Id) != null)
+                {
+                    db.Invoices.Update(invoice);
+                }
+                else
+                {
+                    db.Invoices.Add(invoice);
+                }
 
-                // Commit the transaction
-                transaction.Commit();
-
+                db.SaveChanges(); // Save all changes
+                transaction.Commit(); // Commit transaction
                 return 1;  // Success
             }
             catch (Exception ex)
             {
                 transaction.Rollback(); // Rollback the transaction if there is an error
                 Console.WriteLine($"Error while adding invoice: {ex.Message}");
+                if (ex.InnerException != null)
+                {
+                    Console.WriteLine($"Inner exception: {ex.InnerException.Message}");
+                }
                 return 0;  // Failure
             }
         }
-
-
-
-
-
-
         public int Delete(int Id)
         {
             try
@@ -120,7 +131,6 @@ namespace tgropa.Core
                 return 0;
             }
         }
-
         public Invoice Find(int Id)
         {
             try
@@ -133,12 +143,18 @@ namespace tgropa.Core
                 return new Invoice();
             }
         }
-
         public List<Invoice> GetAllData()
-        {
-            throw new NotImplementedException();
-        }
+    {
+        // Fetch all invoices, including related InvoiceItems and Items
+        var invoices = db.Invoices
+                         .Include(i => i.InvoiceItems)  // Eager load InvoiceItems
+                         .ThenInclude(ii => ii.Item)    // Eager load related Items through InvoiceItems
+                         .ToList();                    // Execute the query
 
+            Console.WriteLine("Text written to file successfully!");
+            // Return the list of invoices
+            return invoices;
+    }
         public List<Invoice> Search(string searchItem)
         {
             try
@@ -151,7 +167,6 @@ namespace tgropa.Core
                 return new List<Invoice>();
             }
         }
-
         public int Update(Invoice entity)
         {
             try
@@ -166,5 +181,36 @@ namespace tgropa.Core
                 return 0;
             }
         }
+        public void show(List<Invoice> invoices)
+        {
+            String output = new String("الفواتير");
+            try
+            {
+                // Iterate over the invoices and print details
+                foreach (var invoice in invoices)
+                {
+
+                    output += ($"\n************** Invoice ID: {invoice.Id}, Description: {invoice.Description} **************\n");
+                    output += "                                              العناصر";
+                    // Iterate over each item in the invoice
+                    foreach (var invoiceItem in invoice.InvoiceItems)
+                    {
+                        var item = invoiceItem.Item; // Get the related item through the InvoiceItem
+                        output += ($"\n                        Item Name: {item.Name}, Quantity: {invoiceItem.Quantity}");
+                    }
+
+                }
+                string filePath = "فواتير.txt";
+
+                // Write the Arabic text to the file with UTF-8 encoding
+                File.WriteAllText(filePath, output, Encoding.UTF8);
+
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(ex.ToString());
+            }
+        }
+
     }
 }

@@ -1,5 +1,6 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using System.Linq;
+using System.Text;
 using tgropa.Data;
 namespace tgropa.Core
 {
@@ -99,6 +100,19 @@ namespace tgropa.Core
                 Console.WriteLine($"Error: {ex.Message}");
                 return 0;
             }
+        }
+        public void show(List<Item> items)
+        {
+            String output = new("المخزن");
+            foreach (var item in items)
+            {
+                output += ($"\nItem ID: {item.Id}, Name: {item.Name},intialPrice:  {item.InitialPrice}, picePrice: {item.RetailPrice},wholesalePrice: {item.WholesalePrice},Quantity: {item.Quantity}");
+            }
+            output += ("\n----------------------------");
+            string filePath = "مخازن.txt";
+            // Write the Arabic text to the file with UTF-8 encoding
+            File.WriteAllText(filePath, output, Encoding.UTF8);
+
         }
     }
 }
